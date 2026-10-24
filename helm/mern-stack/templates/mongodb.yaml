@@ -56,16 +56,23 @@ spec:
               mountPath: /data/db
           resources:
             {{- toYaml .Values.mongodb.resources | nindent 12 }}
+          # mongosh is a heavy process; the default 1s probe timeout is too
+          # tight on small nodes and causes false CrashLoopBackOff. Give it
+          # room with timeoutSeconds/failureThreshold and a longer start delay.
           livenessProbe:
             exec:
-              command: ["mongosh", "--eval", "db.adminCommand('ping')"]
-            initialDelaySeconds: 20
+              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+            initialDelaySeconds: 40
             periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 6
           readinessProbe:
             exec:
-              command: ["mongosh", "--eval", "db.adminCommand('ping')"]
-            initialDelaySeconds: 10
+              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+            initialDelaySeconds: 20
             periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 6
   volumeClaimTemplates:
     - metadata:
         name: data
