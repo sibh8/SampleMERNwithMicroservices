@@ -6,7 +6,8 @@ kind: ClusterConfig
 metadata:
   name: mern-eks-cluster
   region: ap-south-1
-  version: "1.30"
+  # Must be a currently-supported EKS version (1.31-1.37 as of late 2026).
+  version: "1.33"
   tags:
     project: mern-microservices
     environment: dev
