@@ -1,0 +1,64 @@
+# Local development / testing stack for the MERN microservices app.
+# Brings up MongoDB, both backend services, and the nginx-served frontend.
+#
+# Usage:
+#   docker compose up --build
+#   Frontend:        http://localhost:8080
+#   helloService:    http://localhost:3001
+#   profileService:  http://localhost:3002
+services:
+  mongo:
+    image: mongo:7
+    container_name: mern-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  hello-service:
+    build:
+      context: ./backend/helloService
+    container_name: mern-hello-service
+    restart: unless-stopped
+    environment:
+      PORT: "3001"
+    ports:
+      - "3001:3001"
+
+  profile-service:
+    build:
+      context: ./backend/profileService
+    container_name: mern-profile-service
+    restart: unless-stopped
+    environment:
+      PORT: "3002"
+      MONGO_URL: "mongodb://mongo:27017/profileDB"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "3002:3002"
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: mern-frontend
+    restart: unless-stopped
+    environment:
+      # Browser calls these URLs directly, so they must be host-reachable.
+      HELLO_SERVICE_URL: "http://localhost:3001"
+      PROFILE_SERVICE_URL: "http://localhost:3002"
+    depends_on:
+      - hello-service
+      - profile-service
+    ports:
+      - "8080:80"
+
+volumes:
+  mongo-data:

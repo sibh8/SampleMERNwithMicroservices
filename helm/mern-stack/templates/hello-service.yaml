@@ -1,0 +1,83 @@
+{{- if .Values.helloService.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.helloService.name }}
+  labels:
+    {{- include "mern-stack.labels" . | nindent 4 }}
+    app: {{ .Values.helloService.name }}
+spec:
+  {{- if not .Values.helloService.autoscaling.enabled }}
+  replicas: {{ .Values.helloService.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ .Values.helloService.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.helloService.name }}
+    spec:
+      containers:
+        - name: hello-service
+          image: {{ include "mern-stack.image" (list . .Values.helloService.repository) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.helloService.containerPort }}
+          env:
+            - name: PORT
+              value: {{ .Values.helloService.containerPort | quote }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.helloService.containerPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.helloService.containerPort }}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.helloService.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.helloService.name }}
+  labels:
+    {{- include "mern-stack.labels" . | nindent 4 }}
+    app: {{ .Values.helloService.name }}
+spec:
+  type: {{ .Values.helloService.service.type }}
+  selector:
+    app: {{ .Values.helloService.name }}
+  ports:
+    - port: {{ .Values.helloService.service.port }}
+      targetPort: {{ .Values.helloService.containerPort }}
+{{- if .Values.helloService.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ .Values.helloService.name }}
+  labels:
+    {{- include "mern-stack.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ .Values.helloService.name }}
+  minReplicas: {{ .Values.helloService.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.helloService.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.helloService.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,78 @@
+{{- if .Values.mongodb.enabled }}
+---
+# Secret holding the MongoDB connection string consumed by profileService.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.mongodb.name }}-secret
+  labels:
+    {{- include "mern-stack.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  MONGO_URL: {{ .Values.mongodb.url | quote }}
+---
+# Headless-ish ClusterIP service for MongoDB.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.mongodb.name }}
+  labels:
+    {{- include "mern-stack.labels" . | nindent 4 }}
+    app: {{ .Values.mongodb.name }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ .Values.mongodb.name }}
+  ports:
+    - port: {{ .Values.mongodb.port }}
+      targetPort: {{ .Values.mongodb.port }}
+---
+# StatefulSet with a persistent volume so data survives pod restarts.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.mongodb.name }}
+  labels:
+    {{- include "mern-stack.labels" . | nindent 4 }}
+    app: {{ .Values.mongodb.name }}
+spec:
+  serviceName: {{ .Values.mongodb.name }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.mongodb.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.mongodb.name }}
+    spec:
+      containers:
+        - name: mongodb
+          image: {{ .Values.mongodb.image }}
+          ports:
+            - containerPort: {{ .Values.mongodb.port }}
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+          resources:
+            {{- toYaml .Values.mongodb.resources | nindent 12 }}
+          livenessProbe:
+            exec:
+              command: ["mongosh", "--eval", "db.adminCommand('ping')"]
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          readinessProbe:
+            exec:
+              command: ["mongosh", "--eval", "db.adminCommand('ping')"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: {{ .Values.mongodb.storage.storageClassName }}
+        resources:
+          requests:
+            storage: {{ .Values.mongodb.storage.size }}
+{{- end }}

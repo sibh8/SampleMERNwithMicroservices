@@ -1,13 +1,26 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
+// Resolve backend URLs from runtime config (window.__APP_CONFIG__) with
+// build-time env vars and localhost defaults as fallbacks.
+const runtimeConfig =
+  (typeof window !== "undefined" && window.__APP_CONFIG__) || {};
+const HELLO_SERVICE_URL =
+  runtimeConfig.HELLO_SERVICE_URL ||
+  process.env.REACT_APP_HELLO_SERVICE_URL ||
+  "http://localhost:3001";
+const PROFILE_SERVICE_URL =
+  runtimeConfig.PROFILE_SERVICE_URL ||
+  process.env.REACT_APP_PROFILE_SERVICE_URL ||
+  "http://localhost:3002";
+
 function Home() {
   const [message, setMessage] = useState("");
   const [profile, setProfile] = useState([]);
 
   useEffect(() => {
     axios
-      .get("http://localhost:3001/")
+      .get(`${HELLO_SERVICE_URL}/`)
       .then((response) => {
         setMessage(response.data.msg);
       })
@@ -16,7 +29,7 @@ function Home() {
 
   useEffect(() => {
     axios
-      .get("http://localhost:3002/fetchUser")
+      .get(`${PROFILE_SERVICE_URL}/fetchUser`)
       .then((response) => {
         setProfile(response.data);
         

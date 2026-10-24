@@ -1,0 +1,12 @@
+apiVersion: v2
+name: mern-stack
+description: Helm chart deploying the MERN microservices stack (frontend, helloService, profileService, MongoDB) to EKS.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+maintainers:
+  - name: herovired-student
+keywords:
+  - mern
+  - microservices
+  - eks

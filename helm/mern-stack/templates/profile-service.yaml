@@ -1,0 +1,92 @@
+{{- if .Values.profileService.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.profileService.name }}
+  labels:
+    {{- include "mern-stack.labels" . | nindent 4 }}
+    app: {{ .Values.profileService.name }}
+spec:
+  {{- if not .Values.profileService.autoscaling.enabled }}
+  replicas: {{ .Values.profileService.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ .Values.profileService.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.profileService.name }}
+    spec:
+      containers:
+        - name: profile-service
+          image: {{ include "mern-stack.image" (list . .Values.profileService.repository) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.profileService.containerPort }}
+          env:
+            - name: PORT
+              value: {{ .Values.profileService.containerPort | quote }}
+            - name: MONGO_URL
+              {{- if .Values.mongodb.enabled }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.mongodb.name }}-secret
+                  key: MONGO_URL
+              {{- else }}
+              value: {{ .Values.mongodb.url | quote }}
+              {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.profileService.containerPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.profileService.containerPort }}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.profileService.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.profileService.name }}
+  labels:
+    {{- include "mern-stack.labels" . | nindent 4 }}
+    app: {{ .Values.profileService.name }}
+spec:
+  type: {{ .Values.profileService.service.type }}
+  selector:
+    app: {{ .Values.profileService.name }}
+  ports:
+    - port: {{ .Values.profileService.service.port }}
+      targetPort: {{ .Values.profileService.containerPort }}
+{{- if .Values.profileService.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ .Values.profileService.name }}
+  labels:
+    {{- include "mern-stack.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ .Values.profileService.name }}
+  minReplicas: {{ .Values.profileService.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.profileService.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.profileService.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}
+{{- end }}

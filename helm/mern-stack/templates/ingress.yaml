@@ -1,0 +1,49 @@
+{{- if .Values.ingress.enabled }}
+# Single ALB fronting the stack:
+#   /api/hello/*   -> helloService
+#   /api/profile/* -> profileService
+#   /*             -> frontend (catch-all, must be last)
+#
+# Note: the backends serve their routes at the root (e.g. "/", "/fetchUser").
+# The frontend env (HELLO_SERVICE_URL=/api/hello, PROFILE_SERVICE_URL=/api/profile)
+# prefixes requests; a production setup would add an ALB rewrite rule or mount the
+# Express apps under these prefixes. For a simpler demo, set the frontend env values
+# to the backends' own LoadBalancer/Ingress hostnames instead.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mern-ingress
+  labels:
+    {{- include "mern-stack.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - {{- if .Values.ingress.host }}
+      host: {{ .Values.ingress.host | quote }}
+      {{- end }}
+      http:
+        paths:
+          - path: /api/hello
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.helloService.name }}
+                port:
+                  number: {{ .Values.helloService.service.port }}
+          - path: /api/profile
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.profileService.name }}
+                port:
+                  number: {{ .Values.profileService.service.port }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.frontend.name }}
+                port:
+                  number: {{ .Values.frontend.service.port }}
+{{- end }}

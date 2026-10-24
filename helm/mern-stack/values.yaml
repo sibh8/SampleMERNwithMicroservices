@@ -1,0 +1,107 @@
+# Default values for the mern-stack chart.
+# Override image.registry and image.tag at deploy time, e.g.:
+#   helm upgrade --install mern ./helm/mern-stack \
+#     --set image.registry=123456789012.dkr.ecr.ap-south-1.amazonaws.com \
+#     --set image.tag=abc1234
+
+# Shared image settings. registry is the ECR registry host (no trailing slash).
+image:
+  registry: 123456789012.dkr.ecr.ap-south-1.amazonaws.com
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# ---------------- Frontend (React + nginx) ----------------
+frontend:
+  enabled: true
+  name: mern-frontend
+  repository: mern-frontend
+  replicaCount: 2
+  containerPort: 80
+  service:
+    type: ClusterIP
+    port: 80
+  # Browser-facing URLs for the backends. These are injected into the
+  # runtime config.js at container start. Set to the Ingress/ALB hostname
+  # paths once the ALB DNS name is known (see ingress section).
+  env:
+    HELLO_SERVICE_URL: "/api/hello"
+    PROFILE_SERVICE_URL: "/api/profile"
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits:   { cpu: 200m, memory: 128Mi }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+# ---------------- helloService (Express) ----------------
+helloService:
+  enabled: true
+  name: mern-hello-service
+  repository: mern-hello-service
+  replicaCount: 2
+  containerPort: 3001
+  service:
+    type: ClusterIP
+    port: 3001
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits:   { cpu: 200m, memory: 128Mi }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+# ---------------- profileService (Express + Mongo) ----------------
+profileService:
+  enabled: true
+  name: mern-profile-service
+  repository: mern-profile-service
+  replicaCount: 2
+  containerPort: 3002
+  service:
+    type: ClusterIP
+    port: 3002
+  # MONGO_URL is sourced from the secret created by this chart (see mongodb).
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits:   { cpu: 300m, memory: 256Mi }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+# ---------------- MongoDB (in-cluster, StatefulSet) ----------------
+# For production prefer Amazon DocumentDB or MongoDB Atlas and set
+# mongodb.enabled=false while pointing profileService at the external URL.
+mongodb:
+  enabled: true
+  name: mern-mongo
+  image: mongo:7
+  port: 27017
+  database: profileDB
+  # Connection string handed to profileService. Points at the in-cluster service.
+  url: "mongodb://mern-mongo:27017/profileDB"
+  storage:
+    size: 5Gi
+    storageClassName: gp2
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+
+# ---------------- Ingress (ALB via AWS Load Balancer Controller) ----------------
+# Routes:  /            -> frontend
+#          /api/hello   -> helloService (path rewritten to /)
+#          /api/profile -> profileService (path rewritten to /)
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+  host: ""   # optional: set a DNS name, otherwise the ALB hostname is used

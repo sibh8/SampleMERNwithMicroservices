@@ -1,0 +1,17 @@
+MERN stack "{{ .Release.Name }}" deployed to namespace "{{ .Release.Namespace }}".
+
+Check rollout:
+  kubectl -n {{ .Release.Namespace }} get pods
+  kubectl -n {{ .Release.Namespace }} get hpa
+
+{{- if .Values.ingress.enabled }}
+
+Get the ALB address (may take a minute to provision):
+  kubectl -n {{ .Release.Namespace }} get ingress mern-ingress \
+    -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+{{- end }}
+
+Images in use:
+  frontend:        {{ include "mern-stack.image" (list . .Values.frontend.repository) }}
+  helloService:    {{ include "mern-stack.image" (list . .Values.helloService.repository) }}
+  profileService:  {{ include "mern-stack.image" (list . .Values.profileService.repository) }}
